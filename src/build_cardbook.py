@@ -184,6 +184,7 @@ main{max-width:1180px;margin:0 auto;padding:12px 24px 80px}
 .slider .sv svg{width:72px;height:24px;flex:none}
 .slider .ends{grid-column:1;display:flex;justify-content:space-between;font-size:11px;color:#888}
 .drawer .chip:hover{border-color:var(--flowColor);background:color-mix(in srgb,var(--flowColor) 8%,#fff)}
+.drawer .chip.on:hover{background:var(--flowColor);filter:brightness(.95)}
 .drawer[data-app="ai"] .chip.on{color:#2b1a00}
 .drawer .opt input:focus,.drawer .opt textarea:focus{outline-color:var(--flowColor);border-color:var(--flowColor)}
 .drawer .sizerow .apply{border-color:var(--flowColor);color:var(--flowColor)}
@@ -482,6 +483,33 @@ ${mood ? `  ・雰囲気：${mood}\n` : ''}  ・文字種：${kind}
   3. 【書く文章】と2を1行ずつ比べ、違う字があれば全部挙げる（無ければ「差異：0件」）`;
   };
 
+  T.pserase = function(st){
+    const M = {none:null,floor:['床・地面','floor'],wall:['壁','wall'],sky:['空','sky'],grass:['芝生・草','grass'],water:['水面','water surface'],cloth:['布・紙','fabric / paper'],road:['道路・アスファルト','asphalt road']};
+    let ja = M[st.around||'none'] ? M[st.around][0] : '';
+    const free=(st.aroundFree||'').trim(); if(free) ja=free;
+    const line = ja ? `${ja}の続き、周囲と同じ質感と光` : '（空欄のまま生成）';
+    return `【Photoshop 選択範囲だけ削除・周囲で補完】
+
+■ 生成塗りつぶしに入れる言葉（この1行だけ。空欄のままでも可）
+${line}
+
+■ 手順（上から順に試す）
+  0. 選択範囲は消す物よりひと回り大きく取る（影・輪郭の色まで含める）。必要なら「選択範囲を変更 → 拡張」で 4〜8px
+  1. コンテンツに応じた塗りつぶし（編集 → コンテンツに応じた塗りつぶし）
+     画像の選択範囲外の画素だけで埋める。サンプリング範囲を塗って調整し、出力先は「新規レイヤー」
+  2. 1で模様がずれる・繰り返しが目立つ場合：生成塗りつぶしを、プロンプト空欄で生成
+  3. 2で余計な物が描かれる場合：上の1行を入れて生成。3案を切り替えて選ぶ
+
+■ 書かない言葉
+  「削除」「消す」「〜なし」「〜を取る」は書かない。否定が伝わらず、消したい物が描かれることがある
+  書くのは「消した後にそこに見えるもの」だけ
+
+■ 仕上げの確認
+  ・拡大して、埋めた部分に文字・模様・物が新しく入っていないか
+  ・周囲と明るさ・ノイズ・ぼけ具合がそろっているか（浮いて見えたら、範囲を広げて再生成）
+  ・広い範囲は一度にやらず、数回に分ける（生成部分は粗くなりやすい）`;
+  };
+
   function composeOneShot(fn, st){
     const a = fn(Object.assign({}, st, {step:'1'}));
     let b = fn(Object.assign({}, st, {step:'2'}));
@@ -520,6 +548,7 @@ ${mood ? `  ・雰囲気：${mood}\n` : ''}  ・文字種：${kind}
     card: `<svg viewBox="0 0 24 24" ${K}><rect x="2" y="6" width="20" height="12" rx="2"/><path class="l l0" d="M6 11h7"/><path class="l l1" d="M6 14h5"/></svg>`,
     grid: `<svg viewBox="0 0 24 24" ${K}><rect class="g" x="3" y="4" width="18" height="16" rx="1"/><path class="g" d="M3 9.5h18M3 15h18M9 4v16M15 4v16"/></svg>`,
     gridPhoto:`<svg viewBox="0 0 24 24" ${K} style="color:#888"><path d="M4.5 5l15-1.5L20 19.5 4 20.5z"/><path d="M4.4 10.2l15.3-1.1M4.2 15.4l15.5-.6M9.5 4.5l-.3 15.6M14.8 4l.3 16"/></svg>`,
+    erase:`<svg viewBox="0 0 24 24" ${K}><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3.5 17l5-5 4 4 3-3 5 5"/><rect x="12" y="6.5" width="6.5" height="6" rx=".5" stroke-dasharray="1.6 1.4"/><circle class="obj" cx="15.25" cy="9.5" r="1.8" fill="currentColor"/></svg>`,
     check:`<svg viewBox="0 0 24 24" ${K}><circle cx="12" cy="12" r="9"/><path class="ck" d="M7.5 12.5l3 3 6-6.5"/></svg>`,
     surface:`<svg viewBox="0 0 24 24" ${K}><rect class="fillrect" x="3" y="12" width="18" height="8" rx="1.5" fill="#ddd" stroke="none"/><rect x="3" y="12" width="18" height="8" rx="1.5"/><circle cx="12" cy="9" r="4" fill="#fff"/></svg>`,
     next: `<svg viewBox="0 0 24 24" ${K}><text x="12" y="17" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor" stroke="none">次</text></svg>`,
@@ -571,6 +600,8 @@ ${mood ? `  ・雰囲気：${mood}\n` : ''}  ・文字種：${kind}
 .sc.k${k}.an-hue svg{animation:hue${k} 7s linear infinite}
 @keyframes fillc${k}{0%,${b}%{fill:#ddd}${b+4}%{fill:#e8d9b8}${b+9}%{fill:#cfd8dc}${b+14}%,93%{fill:#b8d8c8}100%{fill:#b8d8c8}}
 .sc.k${k}.an-fill .fillrect{animation:fillc${k} 7s linear infinite}
+@keyframes erase${k}{0%,${b}%{opacity:1;transform:scale(1)}${b+8}%,100%{opacity:0;transform:scale(.4)}}
+.sc.k${k}.an-erase .obj{transform-box:fill-box;transform-origin:center;animation:erase${k} 7s ease-out infinite}
 @keyframes sc0${k}{0%,${b}%{transform:translate(0,0)}${b+6}%,100%{transform:translate(-2px,-2px)}}
 @keyframes sc1${k}{0%,${b}%{transform:translate(0,0)}${b+6}%,100%{transform:translate(2px,-2px)}}
 @keyframes sc2${k}{0%,${b}%{transform:translate(0,0)}${b+6}%,100%{transform:translate(0,2.5px)}}
@@ -677,6 +708,12 @@ ${mood ? `  ・雰囲気：${mood}\n` : ''}  ・文字種：${kind}
         {id:'col',type:'pair',label:'色（任意・素材の前に付く）',a:{id:'colJa',ph:'例）紺色の'},b:{id:'colEn',ph:'e.g. navy blue'}},
         {id:'matfree',type:'pair',label:'自由入力（素材を上書き）',a:{id:'matJa',ph:'例）黒い石板'},b:{id:'matEn',ph:'e.g. black slate'}}
       ],tmpl:'psfill'},
+    {id:'pserase',num:'0',group:'app',name:'Photoshop 選択範囲だけ削除',purpose:'選択した物を消し、周りの画像で埋める。コンテンツに応じた塗りつぶし → 生成塗りつぶしの順で使う',
+      paste:['生成塗りつぶし欄に入れるのは先頭の1行だけ（空欄でも可）'],
+      alert:['生成部分に別の物が入ることがある。拡大して確認'],apps:['ps'],scene:[{i:'erase',lb:'選択'},'>',{i:'erase',lb:'周りで埋まる',an:'erase'}],io:{inp:'消した後に見えるはずの素材（下で選ぶ。任意）', out:'生成塗りつぶしに入れる1行と、削除の手順'},steps:['消した後に見える素材を選んでコピー（分からなければ「指定しない」）','Photoshop で消す物をひと回り大きく選択','まずコンテンツに応じた塗りつぶし。だめなら生成塗りつぶし（空欄 → 1行）','拡大して、余計な物が入っていないか確認'],flow:'app',opts:[
+        {id:'around',type:'chips',label:'消した後に見える素材',items:[{v:'none',label:'指定しない（空欄で生成）'},{v:'floor',label:'床・地面'},{v:'wall',label:'壁'},{v:'sky',label:'空'},{v:'grass',label:'芝生・草'},{v:'water',label:'水面'},{v:'cloth',label:'布・紙'},{v:'road',label:'道路'}],def:'none'},
+        {id:'aroundFree',type:'text',label:'自由入力（素材を上書き）',ph:'例）木目のテーブル'}
+      ],tmpl:'pserase'},
     {id:'psup',num:'6',group:'app',name:'Photoshop 画質だけ補完',purpose:'内容を変えずに解像感を上げる手順と補助プロンプト。文字・顔は要確認',
       paste:['解像度は手動で上げる（画像解像度／Camera Raw 強化／スーパーズーム）','プロンプトは、残った粗い部分を狭く選択して使う'],
       alert:['解像度は手動で上げる（⌘⌥I）','文字・顔が崩れる。拡大して原本と確認'],apps:['ps'],scene:[{i:'imgblur',lb:'粗い'},'>',{i:'img',lb:'精細',an:'sharp'}],io:{inp:'（画像は貼らない。Photoshop 上の手順）', out:'解像度を上げる手順と、仕上げ用の補助プロンプト'},steps:['Photoshop で 画像解像度（⌘⌥I）→ 再サンプル「ディテールを保持 2.0」で画素数を上げる','残った粗い部分だけ狭く選択し、プロンプトを生成塗りつぶしに貼る（任意）','文字・顔を拡大して確認。文字・ロゴがある画像は生成を使わない'],flow:'app',opts:[],tmpl:'psup'},
